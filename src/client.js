@@ -24,15 +24,32 @@ window.__ModuleLoader__.load({
       Z: [[1, 1, 0], [0, 1, 1], [0, 0, 0]],
     })
 
+    // Qoder's PixelBlocksGame palette: blue, lavender, orange, yellow,
+    // teal, purple, pink. Cells are painted at 80% over the page.
     const COLORS = Object.freeze({
-      I: '#7dd3fc',
-      J: '#8b9cf7',
-      L: '#f6b26b',
-      O: '#f4d35e',
-      S: '#7fbf9b',
-      T: '#b794f6',
-      Z: '#f28bb6',
+      I: '#3f8ef7',
+      J: '#b49ef9',
+      L: '#ea873f',
+      O: '#f2c647',
+      S: '#55b5a6',
+      T: '#605ce5',
+      Z: '#da5597',
     })
+
+    // Qoder's brighter palette for the dark surface.
+    const COLORS_DARK = Object.freeze({
+      I: '#4ba8ff',
+      J: '#c9b5ff',
+      L: '#fa8125',
+      O: '#fac414',
+      S: '#4dd4c4',
+      T: '#9b96ff',
+      Z: '#f472b6',
+    })
+
+    const CELL_GAP = 3
+    const CELL_RADIUS = 2
+    const BLOCK_ALPHA = 0.8
 
     function emptyRow() {
       return Array(COLS).fill(null)
@@ -89,14 +106,25 @@ window.__ModuleLoader__.load({
       return bag
     }
 
-    function drawBlock(context, x, y, size, color) {
-      const gap = Math.max(1, Math.round(size * 0.08))
-      const left = Math.round(x + gap / 2)
-      const top = Math.round(y + gap / 2)
-      const side = Math.max(1, Math.round(size - gap))
-
+    /**
+     * Qoder paints the playfield as loose tiles, never as a continuous board:
+     * 3px gutters between cells and a 2px radius on each tile. The gaps stay
+     * transparent so the overlay sits directly on the host background.
+     */
+    function drawCell(context, x, y, size, color, alpha) {
+      const radius = Math.min(CELL_RADIUS, size / 2)
+      context.save()
+      context.globalAlpha = alpha
       context.fillStyle = color
-      context.fillRect(left, top, side, side)
+      context.beginPath()
+      context.moveTo(x + radius, y)
+      context.arcTo(x + size, y, x + size, y + size, radius)
+      context.arcTo(x + size, y + size, x, y + size, radius)
+      context.arcTo(x, y + size, x, y, radius)
+      context.arcTo(x, y, x + size, y, radius)
+      context.closePath()
+      context.fill()
+      context.restore()
     }
 
     function createGame(canvas, hooks = {}) {
@@ -135,7 +163,6 @@ window.__ModuleLoader__.load({
         const piece = {
           type,
           matrix,
-          color: COLORS[type],
           x: Math.floor((COLS - matrix.length) / 2),
           y: 0,
         }
@@ -157,7 +184,7 @@ window.__ModuleLoader__.load({
           for (let col = 0; col < current.matrix.length; col += 1) {
             if (!current.matrix[row][col]) continue
             const boardY = current.y + row
-            if (boardY >= 0 && boardY < ROWS) board[boardY][current.x + col] = current.color
+            if (boardY >= 0 && boardY < ROWS) board[boardY][current.x + col] = current.type
           }
         }
         const result = clearFullRows(board)
@@ -241,53 +268,55 @@ window.__ModuleLoader__.load({
         context.setTransform(dpr, 0, 0, dpr, 0, 0)
         context.clearRect(0, 0, rect.width, rect.height)
 
-        const cell = Math.min(rect.width / COLS, rect.height / ROWS)
-        const boardWidth = cell * COLS
-        const boardHeight = cell * ROWS
+        const cell = Math.max(
+          1,
+          Math.min(
+            (rect.width - CELL_GAP * (COLS - 1)) / COLS,
+            (rect.height - CELL_GAP * (ROWS - 1)) / ROWS,
+          ),
+        )
+        const boardWidth = cell * COLS + CELL_GAP * (COLS - 1)
+        const boardHeight = cell * ROWS + CELL_GAP * (ROWS - 1)
         const originX = (rect.width - boardWidth) / 2
         const originY = (rect.height - boardHeight) / 2
 
-        context.save()
-        context.strokeStyle = 'rgba(148, 163, 184, .28)'
-        context.lineWidth = 1
-        for (let col = 0; col <= COLS; col += 1) {
-          const x = Math.round(originX + col * cell) + 0.5
-          context.beginPath()
-          context.moveTo(x, originY)
-          context.lineTo(x, originY + boardHeight)
-          context.stroke()
+        let emptyColor = '#f0f3f2'
+        if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
+          const themed = window.getComputedStyle(canvas).getPropertyValue('--dsh-tetris-empty').trim()
+          if (themed) emptyColor = themed
         }
-        for (let row = 0; row <= ROWS; row += 1) {
-          const y = Math.round(originY + row * cell) + 0.5
-          context.beginPath()
-          context.moveTo(originX, y)
-          context.lineTo(originX + boardWidth, y)
-          context.stroke()
-        }
-        context.restore()
+        const dark = typeof document !== 'undefined'
+          && document.body
+          && document.body.hasAttribute('data-ds-dark-theme')
+        const palette = dark ? COLORS_DARK : COLORS
 
-        for (let row = 0; row < ROWS; row += 1) {
-          for (let col = 0; col < COLS; col += 1) {
-            const color = board[row][col]
-            if (!color) continue
-            drawBlock(context, originX + col * cell, originY + row * cell, cell, color)
-          }
-        }
-
+        // Merge the settled board and the active piece into one display grid so
+        // a translucent tile is always painted over the page, never over an
+        // empty tile underneath it.
+        const display = board.map((row) => row.slice())
         if (current && !over) {
           for (let row = 0; row < current.matrix.length; row += 1) {
             for (let col = 0; col < current.matrix.length; col += 1) {
               if (!current.matrix[row][col]) continue
               const y = current.y + row
               if (y < 0) continue
-              drawBlock(
-                context,
-                originX + (current.x + col) * cell,
-                originY + y * cell,
-                cell,
-                current.color,
-              )
+              display[y][current.x + col] = current.type
             }
+          }
+        }
+
+        const dimmed = paused || over
+        const emptyAlpha = dimmed ? 0.55 : 1
+        const blockAlpha = dimmed ? BLOCK_ALPHA * 0.45 : BLOCK_ALPHA
+
+        for (let row = 0; row < ROWS; row += 1) {
+          for (let col = 0; col < COLS; col += 1) {
+            const type = display[row][col]
+            const color = type ? palette[type] || type : null
+            const x = originX + col * (cell + CELL_GAP)
+            const y = originY + row * (cell + CELL_GAP)
+            if (color) drawCell(context, x, y, cell, color, blockAlpha)
+            else drawCell(context, x, y, cell, emptyColor, emptyAlpha)
           }
         }
       }
@@ -416,7 +445,7 @@ window.__ModuleLoader__.load({
         border: 0;
         border-radius: 0;
         background: transparent;
-        opacity: .78;
+        opacity: .9;
         cursor: pointer;
         transition: opacity .12s ease;
       }
@@ -426,11 +455,11 @@ window.__ModuleLoader__.load({
         width: 16px;
         height: 16px;
         border-radius: 0;
-        background: #b794f6;
+        background: #605ce5;
       }
       .dsh-tetris-launch:hover { opacity: 1; }
       .dsh-tetris-launch:focus-visible {
-        outline: 1px solid #b794f6;
+        outline: 1px solid #605ce5;
         outline-offset: 3px;
       }
 
@@ -438,69 +467,75 @@ window.__ModuleLoader__.load({
         display: flex;
         flex-direction: column;
         align-items: center;
-        width: min(300px, calc(100vw - 24px));
-        max-height: calc(100dvh - 32px);
-        padding: 0;
+        width: fit-content;
+        max-width: calc(100vw - 24px);
+        max-height: calc(100dvh - 24px);
+        padding: 8px;
         border: 0;
         border-radius: 0;
-        background: transparent;
+        background: var(--dsw-alias-bg-base, #fff);
         box-shadow: none;
         outline: none;
         color: inherit;
       }
+      body[data-ds-dark-theme] .dsh-tetris-panel {
+        background: var(--dsw-alias-bg-base, #151517);
+      }
 
       .dsh-tetris-stage {
+        position: relative;
         display: flex;
         justify-content: center;
-        width: 100%;
-        overflow: visible;
+        width: min(147px, calc(100vw - 48px), calc((100dvh - 96px) / 2.02));
+        max-width: 100%;
+        overflow: hidden;
         background: transparent;
-        border-radius: 0;
-        box-shadow: none;
       }
       .dsh-tetris-canvas {
         display: block;
-        width: auto;
-        height: min(56dvh, 560px);
-        aspect-ratio: 1 / 2;
-        max-width: 100%;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 147 / 297;
         background: transparent;
+        --dsh-tetris-empty: #f0f3f2;
         touch-action: none;
+      }
+      body[data-ds-dark-theme] .dsh-tetris-canvas {
+        --dsh-tetris-empty: #1c2e25;
       }
 
       .dsh-tetris-footer {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 4px;
+        justify-content: center;
         width: 100%;
-        padding: 5px 2px 0;
+        min-height: 0;
+        margin-top: 8px;
+        padding: 0;
         background: transparent;
       }
       .dsh-tetris-status {
-        min-height: 13px;
-        margin: 0;
-        color: #8b5cf6;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 9.5px;
-        font-weight: 600;
-        line-height: 13px;
+        margin: 0 0 2px;
+        color: inherit;
+        font-size: 11px;
+        font-weight: 500;
+        line-height: 1.4;
         letter-spacing: .12em;
         text-align: center;
-        white-space: nowrap;
+        opacity: .8;
       }
-      .dsh-tetris-status[data-over="true"] { color: #e0447f; }
       .dsh-tetris-hint {
         display: flex;
-        flex-wrap: wrap;
-        justify-content: center;
-        gap: 2px 9px;
+        flex-direction: column;
+        align-items: center;
+        gap: 1px;
         margin: 0;
         color: inherit;
-        opacity: .68;
-        font-size: 10px;
-        line-height: 1.55;
-        letter-spacing: .02em;
+        opacity: .62;
+        font-size: 12px;
+        line-height: 1.45;
+        letter-spacing: 0;
         text-align: center;
       }
       .dsh-tetris-hint span { white-space: nowrap; }
@@ -510,13 +545,17 @@ window.__ModuleLoader__.load({
           right: max(12px, env(safe-area-inset-right));
           bottom: max(12px, env(safe-area-inset-bottom));
         }
-        .dsh-tetris-panel { width: min(300px, calc(100vw - 20px)); }
-        .dsh-tetris-canvas { height: min(52dvh, 540px); }
-        .dsh-tetris-hint { gap: 2px 7px; font-size: 9.5px; }
+        .dsh-tetris-stage {
+          width: min(147px, calc(100vw - 40px), calc((100dvh - 88px) / 2.02));
+        }
       }
       @media (max-height: 560px) {
-        .dsh-tetris-canvas { height: min(50dvh, 340px); }
-        .dsh-tetris-hint { font-size: 8.5px; }
+        .dsh-tetris-root { bottom: max(12px, env(safe-area-inset-bottom)); }
+        .dsh-tetris-panel { padding: 6px; }
+        .dsh-tetris-stage {
+          width: min(147px, calc(100vw - 40px), calc((100dvh - 72px) / 2.02));
+        }
+        .dsh-tetris-footer { margin-top: 6px; }
       }
       @media (prefers-reduced-motion: reduce) {
         .dsh-tetris-launch { transition: none; }
@@ -633,10 +672,9 @@ window.__ModuleLoader__.load({
           return
         }
 
-        if (key === 'p' || key === 'P') {
+        if (key === 'x' || key === 'X' || key === 'z' || key === 'Z' || key === 'p' || key === 'P') {
           event.preventDefault()
           event.stopPropagation()
-          togglePause()
           return
         }
 
@@ -650,12 +688,11 @@ window.__ModuleLoader__.load({
         }
 
         if (paused) {
-          if (
-            key.startsWith('Arrow') ||
-            key === ' ' ||
-            key === 'x' || key === 'X' ||
-            key === 'z' || key === 'Z'
-          ) {
+          if (key === ' ') {
+            event.preventDefault()
+            event.stopPropagation()
+            togglePause()
+          } else if (key.startsWith('Arrow')) {
             event.preventDefault()
             event.stopPropagation()
           }
@@ -679,22 +716,14 @@ window.__ModuleLoader__.load({
             gameRef.current?.softDrop()
             break
           case 'ArrowUp':
-          case 'x':
-          case 'X':
             event.preventDefault()
             event.stopPropagation()
             gameRef.current?.rotateCW()
             break
-          case 'z':
-          case 'Z':
-            event.preventDefault()
-            event.stopPropagation()
-            gameRef.current?.rotateCCW()
-            break
           case ' ':
             event.preventDefault()
             event.stopPropagation()
-            gameRef.current?.hardDrop()
+            togglePause()
             break
           default:
             break
@@ -728,7 +757,7 @@ window.__ModuleLoader__.load({
             role: 'dialog',
             'aria-modal': 'false',
             'aria-label': '俄罗斯方块',
-            'aria-describedby': 'dsh-tetris-hint',
+            'aria-describedby': 'dsh-tetris-guide',
             tabIndex: 0,
             onKeyDown: handleKeyDown,
             onBlur: handleBlur,
@@ -740,39 +769,47 @@ window.__ModuleLoader__.load({
             h('canvas', {
               ref: canvasRef,
               className: 'dsh-tetris-canvas',
-              width: 300,
-              height: 600,
+              width: 147,
+              height: 297,
               'aria-hidden': 'true',
             }),
           ),
           h(
             'footer',
-            { className: 'dsh-tetris-footer' },
-            h(
-              'p',
-              {
-                className: 'dsh-tetris-status',
-                'data-over': over ? 'true' : 'false',
-                role: 'status',
-                'aria-live': 'polite',
-                'aria-atomic': 'true',
-              },
-              over ? 'GAME OVER · R 重开' : paused ? 'PAUSED · P 继续' : '',
-            ),
+            {
+              className: 'dsh-tetris-footer',
+              id: 'dsh-tetris-guide',
+            },
+            paused || over
+              ? h(
+                  'p',
+                  {
+                    className: 'dsh-tetris-status',
+                    role: 'status',
+                    'aria-live': 'polite',
+                    'aria-atomic': 'true',
+                  },
+                  over ? '游戏结束' : '已暂停',
+                )
+              : null,
             h(
               'p',
               {
                 className: 'dsh-tetris-hint',
-                id: 'dsh-tetris-hint',
-                'aria-label': '左、右移动，上或 X 旋转，Z 逆转，下软降，空格硬降，P 暂停，Esc 收起',
+                'aria-label': over
+                  ? 'R 重新开始，Esc 收起'
+                  : paused
+                    ? '空格继续，Esc 收起'
+                    : '左、右移动，上旋转，下软降，空格暂停，Esc 收起',
               },
-              h('span', null, '← → 移动'),
-              h('span', null, '↑ / X 旋转'),
-              h('span', null, 'Z 逆转'),
-              h('span', null, '↓ 软降'),
-              h('span', null, '空格 硬降'),
-              h('span', null, 'P 暂停'),
-              h('span', null, 'Esc 收起'),
+              over
+                ? h('span', null, 'R 重新开始　Esc 收起')
+                : paused
+                  ? h('span', null, '空格 继续　Esc 收起')
+                  : [
+                      h('span', { key: 'move' }, '←→ 移动　↑ 旋转　↓ 降'),
+                      h('span', { key: 'system' }, '空格 暂停　Esc 收起'),
+                    ],
             ),
           ),
         ),
