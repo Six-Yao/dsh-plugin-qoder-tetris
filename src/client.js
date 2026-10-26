@@ -5,10 +5,6 @@ window.__ModuleLoader__.load({
     const { useEffect, useRef, useState } = React
     const h = React.createElement
 
-    // ---------------------------------------------------------------------
-    // Game model
-    // ---------------------------------------------------------------------
-
     const COLS = 10
     const ROWS = 20
     const GRAVITY_MS = 680
@@ -24,8 +20,6 @@ window.__ModuleLoader__.load({
       Z: [[1, 1, 0], [0, 1, 1], [0, 0, 0]],
     })
 
-    // Qoder's PixelBlocksGame palette: blue, lavender, orange, yellow,
-    // teal, purple, pink. Cells are painted at 80% over the page.
     const COLORS = Object.freeze({
       I: '#3f8ef7',
       J: '#b49ef9',
@@ -36,7 +30,6 @@ window.__ModuleLoader__.load({
       Z: '#da5597',
     })
 
-    // Qoder's brighter palette for the dark surface.
     const COLORS_DARK = Object.freeze({
       I: '#4ba8ff',
       J: '#c9b5ff',
@@ -59,16 +52,9 @@ window.__ModuleLoader__.load({
       return Array.from({ length: ROWS }, emptyRow)
     }
 
-    /** Rotate a square matrix 90 degrees clockwise. */
     function rotateCW(matrix) {
       const size = matrix.length
       return matrix.map((row, y) => row.map((_, x) => matrix[size - 1 - x][y]))
-    }
-
-    /** Rotate a square matrix 90 degrees counter-clockwise. */
-    function rotateCCW(matrix) {
-      const size = matrix.length
-      return matrix.map((row, y) => row.map((_, x) => matrix[x][size - 1 - y]))
     }
 
     function collides(board, matrix, x, y) {
@@ -84,7 +70,6 @@ window.__ModuleLoader__.load({
       return false
     }
 
-    /** Remove full rows and return the compacted board plus the row count. */
     function clearFullRows(board) {
       const remaining = board.filter((row) => row.some((cell) => cell === null))
       const cleared = ROWS - remaining.length
@@ -94,7 +79,6 @@ window.__ModuleLoader__.load({
       return { board: next.concat(remaining), cleared }
     }
 
-    /** A shuffled seven-bag keeps piece distribution fair without a score system. */
     function createBag(random) {
       const bag = PIECE_TYPES.slice()
       for (let index = bag.length - 1; index > 0; index -= 1) {
@@ -106,11 +90,6 @@ window.__ModuleLoader__.load({
       return bag
     }
 
-    /**
-     * Qoder paints the playfield as loose tiles, never as a continuous board:
-     * 3px gutters between cells and a 2px radius on each tile. The gaps stay
-     * transparent so the overlay sits directly on the host background.
-     */
     function drawCell(context, x, y, size, color, alpha) {
       const radius = Math.min(CELL_RADIUS, size / 2)
       context.save()
@@ -149,7 +128,7 @@ window.__ModuleLoader__.load({
       }
 
       function emit() {
-        if (typeof hooks.onState === 'function') hooks.onState({ paused, over, started })
+        if (typeof hooks.onState === 'function') hooks.onState({ paused, over })
       }
 
       function canPlay() {
@@ -212,15 +191,9 @@ window.__ModuleLoader__.load({
         return true
       }
 
-      function hardDrop() {
+      function rotate() {
         if (!canPlay()) return
-        while (!collides(board, current.matrix, current.x, current.y + 1)) current.y += 1
-        lockPiece()
-      }
-
-      function rotate(direction) {
-        if (!canPlay()) return
-        const matrix = direction < 0 ? rotateCCW(current.matrix) : rotateCW(current.matrix)
+        const matrix = rotateCW(current.matrix)
         const kicks = [[0, 0], [-1, 0], [1, 0], [-2, 0], [2, 0], [0, -1]]
         for (const [dx, dy] of kicks) {
           if (!collides(board, matrix, current.x + dx, current.y + dy)) {
@@ -232,23 +205,14 @@ window.__ModuleLoader__.load({
         }
       }
 
-      function pause() {
-        if (!started || over || paused) return
-        paused = true
-        emit()
-      }
-
-      function resume() {
-        if (!started || over || !paused) return
-        paused = false
-        lastTime = now()
-        gravityAccumulator = 0
-        emit()
-      }
-
       function togglePause() {
-        if (paused) resume()
-        else pause()
+        if (!started || over) return
+        paused = !paused
+        if (!paused) {
+          lastTime = now()
+          gravityAccumulator = 0
+        }
+        emit()
       }
 
       function draw() {
@@ -290,9 +254,6 @@ window.__ModuleLoader__.load({
           && document.body.hasAttribute('data-ds-dark-theme')
         const palette = dark ? COLORS_DARK : COLORS
 
-        // Merge the settled board and the active piece into one display grid so
-        // a translucent tile is always painted over the page, never over an
-        // empty tile underneath it.
         const display = board.map((row) => row.slice())
         if (current && !over) {
           for (let row = 0; row < current.matrix.length; row += 1) {
@@ -358,7 +319,6 @@ window.__ModuleLoader__.load({
         lastTime = now()
         gravityAccumulator = 0
         spawnPiece()
-        emit()
         draw()
         schedule()
       }
@@ -367,43 +327,17 @@ window.__ModuleLoader__.load({
         disposed = true
         if (raf !== 0 && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(raf)
         raf = 0
-        if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
-          document.removeEventListener('visibilitychange', onVisibilityChange)
-        }
-        if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
-          window.removeEventListener('blur', onWindowBlur)
-        }
-      }
-
-      function onVisibilityChange() {
-        if (typeof document !== 'undefined' && document.hidden) pause()
-      }
-
-      function onWindowBlur() {
-        pause()
-      }
-
-      if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
-        document.addEventListener('visibilitychange', onVisibilityChange)
-      }
-      if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-        window.addEventListener('blur', onWindowBlur)
       }
 
       return {
         start,
         restart: start,
         destroy,
-        pause,
-        resume,
         togglePause,
         moveLeft: () => moveBy(-1, 0),
         moveRight: () => moveBy(1, 0),
         softDrop,
-        hardDrop,
-        rotateCW: () => rotate(1),
-        rotateCCW: () => rotate(-1),
-        draw,
+        rotateCW: rotate,
         getState: () => ({
           board: board.map((row) => row.slice()),
           current: current
@@ -415,10 +349,6 @@ window.__ModuleLoader__.load({
         }),
       }
     }
-
-    // ---------------------------------------------------------------------
-    // Interface
-    // ---------------------------------------------------------------------
 
     const STYLE_TEXT = `
       .dsh-tetris-root,
@@ -596,8 +526,6 @@ window.__ModuleLoader__.load({
           },
         })
         gameRef.current = game
-        setPaused(false)
-        setOver(false)
         game.start()
         const focusFrame = requestAnimationFrame(() => {
           rootRef.current?.focus({ preventScroll: true })
@@ -631,8 +559,6 @@ window.__ModuleLoader__.load({
       }, [open])
 
       function openGame() {
-        setPaused(false)
-        setOver(false)
         setOpen(true)
       }
 
@@ -649,13 +575,10 @@ window.__ModuleLoader__.load({
 
       function restartGame() {
         gameRef.current?.restart()
-        setPaused(false)
-        setOver(false)
         rootRef.current?.focus({ preventScroll: true })
       }
 
       function togglePause() {
-        if (over) return
         gameRef.current?.togglePause()
       }
 
@@ -672,12 +595,6 @@ window.__ModuleLoader__.load({
           event.preventDefault()
           event.stopPropagation()
           collapseGame(true)
-          return
-        }
-
-        if (key === 'x' || key === 'X' || key === 'z' || key === 'Z' || key === 'p' || key === 'P') {
-          event.preventDefault()
-          event.stopPropagation()
           return
         }
 
@@ -839,7 +756,6 @@ window.__ModuleLoader__.load({
       name: 'dsh-plugin-tetris',
       inject: ['slots'],
       apply,
-      // Kept out of the UI surface; the behavior is covered by the package tests.
       __testing: {
         COLS,
         ROWS,
@@ -847,7 +763,6 @@ window.__ModuleLoader__.load({
         COLORS,
         emptyBoard,
         rotateCW,
-        rotateCCW,
         collides,
         clearFullRows,
         createBag,

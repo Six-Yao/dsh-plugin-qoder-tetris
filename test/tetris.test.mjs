@@ -35,14 +35,12 @@ const {
   COLORS,
   emptyBoard,
   rotateCW,
-  rotateCCW,
   collides,
   clearFullRows,
   createBag,
   createGame,
 } = plugin.__testing
 
-/** Small deterministic PRNG so the engine test never flakes. */
 function mulberry32(seed) {
   let value = seed >>> 0
   return function random() {
@@ -96,10 +94,8 @@ test('every tetromino is square, four blocks, and has a color', () => {
   assert.equal(Object.keys(SHAPES).length, 7)
 })
 
-test('rotations are lossless and reversible', () => {
+test('four clockwise turns restore every shape', () => {
   for (const [type, matrix] of Object.entries(SHAPES)) {
-    assert.deepEqual(rotateCW(rotateCCW(matrix)), matrix, `${type} CCW then CW`)
-    assert.deepEqual(rotateCCW(rotateCW(matrix)), matrix, `${type} CW then CCW`)
     assert.deepEqual(rotateCW(rotateCW(rotateCW(rotateCW(matrix)))), matrix, `${type} x4`)
   }
 })
@@ -112,22 +108,22 @@ test('collision handles walls, floor, ceiling, and occupied cells', () => {
   assert.equal(collides(board, matrix, COLS - 1, 0), true, 'right wall')
   assert.equal(collides(board, matrix, 0, ROWS - 1), true, 'floor')
   assert.equal(collides(board, matrix, 0, -1), false, 'above the ceiling is allowed')
-  board[1][1] = '#fff'
+  board[1][1] = 'T'
   assert.equal(collides(board, matrix, 0, 0), true, 'occupied cell')
 })
 
 test('full rows are removed and empty rows are added at the top', () => {
   const board = emptyBoard()
-  board[ROWS - 1].fill('#ff7b9c')
-  board[ROWS - 2][0] = '#48d7ff'
-  board[ROWS - 3].fill('#ffd166')
+  board[ROWS - 1].fill('Z')
+  board[ROWS - 2][0] = 'I'
+  board[ROWS - 3].fill('O')
 
   const result = clearFullRows(board)
   assert.equal(result.cleared, 2)
   assert.equal(result.board.length, ROWS)
   assert.ok(result.board[0].every((cell) => cell === null))
   assert.ok(result.board[1].every((cell) => cell === null))
-  assert.equal(result.board[ROWS - 1][0], '#48d7ff')
+  assert.equal(result.board[ROWS - 1][0], 'I')
   assert.equal(result.board[ROWS - 1][1], null)
 
   const untouched = clearFullRows(emptyBoard())
@@ -142,7 +138,21 @@ test('seven-bag produces each tetromino exactly once', () => {
   }
 })
 
-test('engine starts empty, drops, moves, pauses, and eventually ends', () => {
+function countBlocks(state) {
+  return state.board.flat().filter(Boolean).length
+}
+
+function dropPiece(game) {
+  const boardBefore = JSON.stringify(game.getState().board)
+  for (let step = 0; step <= ROWS; step += 1) {
+    game.softDrop()
+    const state = game.getState()
+    if (state.over || JSON.stringify(state.board) !== boardBefore) return state
+  }
+  throw new Error('piece did not lock')
+}
+
+test('engine starts empty, moves, pauses, and eventually ends', () => {
   const game = createGame(null, { random: mulberry32(7) })
   game.start()
 
@@ -151,7 +161,7 @@ test('engine starts empty, drops, moves, pauses, and eventually ends', () => {
   assert.equal(started.paused, false)
   assert.equal(started.over, false)
   assert.ok(started.current)
-  assert.equal(started.board.flat().filter(Boolean).length, 0)
+  assert.equal(countBlocks(started), 0)
 
   const spawnX = started.current.x
   const spawnY = started.current.y
@@ -162,25 +172,26 @@ test('engine starts empty, drops, moves, pauses, and eventually ends', () => {
   game.softDrop()
   assert.equal(game.getState().current.y, spawnY + 1)
 
-  game.pause()
-  assert.equal(game.getState().paused, true)
-  game.hardDrop()
-  assert.equal(game.getState().board.flat().filter(Boolean).length, 0, 'paused game ignores input')
-  game.resume()
+  game.togglePause()
+  const paused = game.getState()
+  assert.equal(paused.paused, true)
+  game.softDrop()
+  assert.deepEqual(game.getState().current, paused.current)
+  assert.equal(countBlocks(game.getState()), 0, 'paused game ignores input')
+  game.togglePause()
   assert.equal(game.getState().paused, false)
 
-  game.hardDrop()
-  const dropped = game.getState()
-  assert.ok(dropped.board.flat().filter(Boolean).length >= 4)
+  const dropped = dropPiece(game)
+  assert.ok(countBlocks(dropped) >= 4)
   assert.notEqual(dropped.current, null)
 
-  let drops = 0
-  while (!game.getState().over && drops < 200) {
-    game.hardDrop()
-    drops += 1
+  let pieces = 0
+  while (!game.getState().over && pieces < 100) {
+    dropPiece(game)
+    pieces += 1
   }
   assert.equal(game.getState().over, true, 'stack eventually reaches the spawn area')
-  assert.ok(drops < 200)
+  assert.ok(pieces < 100)
 
   game.destroy()
 })
@@ -188,14 +199,14 @@ test('engine starts empty, drops, moves, pauses, and eventually ends', () => {
 test('restart clears the board and makes the game playable again', () => {
   const game = createGame(null, { random: mulberry32(42) })
   game.start()
-  for (let index = 0; index < 12; index += 1) game.hardDrop()
-  assert.ok(game.getState().board.flat().some(Boolean))
+  for (let index = 0; index < 12; index += 1) dropPiece(game)
+  assert.ok(countBlocks(game.getState()) > 0)
 
   game.restart()
   const restarted = game.getState()
   assert.equal(restarted.over, false)
   assert.equal(restarted.paused, false)
-  assert.equal(restarted.board.flat().filter(Boolean).length, 0)
+  assert.equal(countBlocks(restarted), 0)
   assert.ok(restarted.current)
   game.destroy()
 })
