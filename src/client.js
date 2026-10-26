@@ -47,8 +47,8 @@ window.__ModuleLoader__.load({
       Z: '#f472b6',
     })
 
-    const CELL_GAP = 3
-    const CELL_RADIUS = 2
+    const CELL_GAP = 4
+    const CELL_RADIUS = 3
     const BLOCK_ALPHA = 0.8
 
     function emptyRow() {
@@ -439,8 +439,8 @@ window.__ModuleLoader__.load({
         -webkit-appearance: none;
         display: grid;
         place-items: center;
-        width: 32px;
-        height: 32px;
+        width: 48px;
+        height: 48px;
         padding: 0;
         border: 0;
         border-radius: 0;
@@ -452,8 +452,8 @@ window.__ModuleLoader__.load({
       .dsh-tetris-launch::before {
         content: "";
         display: block;
-        width: 16px;
-        height: 16px;
+        width: 24px;
+        height: 24px;
         border-radius: 0;
         background: #605ce5;
       }
@@ -470,7 +470,7 @@ window.__ModuleLoader__.load({
         width: fit-content;
         max-width: calc(100vw - 24px);
         max-height: calc(100dvh - 24px);
-        padding: 8px;
+        padding: 12px;
         border: 0;
         border-radius: 0;
         background: var(--dsw-alias-bg-base, #fff);
@@ -486,7 +486,7 @@ window.__ModuleLoader__.load({
         position: relative;
         display: flex;
         justify-content: center;
-        width: min(147px, calc(100vw - 48px), calc((100dvh - 96px) / 2.02));
+        width: min(220px, calc(100vw - 48px), calc((100dvh - 88px) / 2.018));
         max-width: 100%;
         overflow: hidden;
         background: transparent;
@@ -495,7 +495,7 @@ window.__ModuleLoader__.load({
         display: block;
         width: 100%;
         height: auto;
-        aspect-ratio: 147 / 297;
+        aspect-ratio: 220 / 444;
         background: transparent;
         --dsh-tetris-empty: #f0f3f2;
         touch-action: none;
@@ -506,37 +506,40 @@ window.__ModuleLoader__.load({
 
       .dsh-tetris-footer {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
         justify-content: center;
+        gap: 8px;
         width: 100%;
-        min-height: 0;
+        min-height: 18px;
         margin-top: 8px;
         padding: 0;
         background: transparent;
+        white-space: nowrap;
       }
       .dsh-tetris-status {
-        margin: 0 0 2px;
+        flex: 0 0 auto;
+        margin: 0;
         color: inherit;
         font-size: 11px;
         font-weight: 500;
-        line-height: 1.4;
-        letter-spacing: .12em;
-        text-align: center;
+        line-height: 1.5;
+        letter-spacing: .08em;
         opacity: .8;
       }
       .dsh-tetris-hint {
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
-        gap: 1px;
+        gap: 5px;
         margin: 0;
         color: inherit;
         opacity: .62;
         font-size: 12px;
-        line-height: 1.45;
+        line-height: 1.5;
         letter-spacing: 0;
         text-align: center;
+        white-space: nowrap;
       }
       .dsh-tetris-hint span { white-space: nowrap; }
 
@@ -546,14 +549,14 @@ window.__ModuleLoader__.load({
           bottom: max(12px, env(safe-area-inset-bottom));
         }
         .dsh-tetris-stage {
-          width: min(147px, calc(100vw - 40px), calc((100dvh - 88px) / 2.02));
+          width: min(220px, calc(100vw - 48px), calc((100dvh - 88px) / 2.018));
         }
       }
       @media (max-height: 560px) {
         .dsh-tetris-root { bottom: max(12px, env(safe-area-inset-bottom)); }
         .dsh-tetris-panel { padding: 6px; }
         .dsh-tetris-stage {
-          width: min(147px, calc(100vw - 40px), calc((100dvh - 72px) / 2.02));
+          width: min(220px, calc(100vw - 48px), calc((100dvh - 72px) / 2.018));
         }
         .dsh-tetris-footer { margin-top: 6px; }
       }
@@ -769,8 +772,8 @@ window.__ModuleLoader__.load({
             h('canvas', {
               ref: canvasRef,
               className: 'dsh-tetris-canvas',
-              width: 147,
-              height: 297,
+              width: 220,
+              height: 444,
               'aria-hidden': 'true',
             }),
           ),
@@ -780,18 +783,6 @@ window.__ModuleLoader__.load({
               className: 'dsh-tetris-footer',
               id: 'dsh-tetris-guide',
             },
-            paused || over
-              ? h(
-                  'p',
-                  {
-                    className: 'dsh-tetris-status',
-                    role: 'status',
-                    'aria-live': 'polite',
-                    'aria-atomic': 'true',
-                  },
-                  over ? '游戏结束' : '已暂停',
-                )
-              : null,
             h(
               'p',
               {
@@ -802,13 +793,34 @@ window.__ModuleLoader__.load({
                     ? '空格继续，Esc 收起'
                     : '左、右移动，上旋转，下软降，空格暂停，Esc 收起',
               },
+              paused || over
+                ? h(
+                    'span',
+                    {
+                      className: 'dsh-tetris-status',
+                      role: 'status',
+                      'aria-live': 'polite',
+                      'aria-atomic': 'true',
+                    },
+                    over ? '游戏结束' : '已暂停',
+                  )
+                : null,
               over
-                ? h('span', null, 'R 重新开始　Esc 收起')
+                ? [
+                    h('span', { key: 'restart' }, 'R 重开'),
+                    h('span', { key: 'close' }, 'Esc 收起'),
+                  ]
                 : paused
-                  ? h('span', null, '空格 继续　Esc 收起')
+                  ? [
+                      h('span', { key: 'resume' }, '空格继续'),
+                      h('span', { key: 'close' }, 'Esc 收起'),
+                    ]
                   : [
-                      h('span', { key: 'move' }, '←→ 移动　↑ 旋转　↓ 降'),
-                      h('span', { key: 'system' }, '空格 暂停　Esc 收起'),
+                      h('span', { key: 'move' }, '←→移动'),
+                      h('span', { key: 'rotate' }, '↑旋转'),
+                      h('span', { key: 'drop' }, '↓降'),
+                      h('span', { key: 'pause' }, '空格暂停'),
+                      h('span', { key: 'close' }, 'Esc 收起'),
                     ],
             ),
           ),
