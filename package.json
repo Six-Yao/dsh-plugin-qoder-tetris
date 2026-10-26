@@ -1,0 +1,47 @@
+{
+  "name": "dsh-plugin-tetris",
+  "version": "0.1.0",
+  "description": "A tiny, no-score Tetris that lives in the bottom-right corner of the DeepSeek Harness Web GUI.",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "tetris",
+    "game"
+  ],
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./src/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "docs"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    },
+    "compatibility": {
+      "dshReleases": {
+        "0.2.1-rc.2": "compatible"
+      }
+    },
+    "hostMin": "0.2.0-rc.1"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/client.js && node --check src/index.js && node --test"
+  },
+  "license": "MIT"
+}
