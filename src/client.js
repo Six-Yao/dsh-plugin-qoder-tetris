@@ -25,13 +25,13 @@ window.__ModuleLoader__.load({
     })
 
     const COLORS = Object.freeze({
-      I: '#48d7ff',
-      J: '#6d8dff',
-      L: '#ffb454',
-      O: '#ffd166',
-      S: '#5ee08a',
-      T: '#b98cff',
-      Z: '#ff7b9c',
+      I: '#7dd3fc',
+      J: '#8b9cf7',
+      L: '#f6b26b',
+      O: '#f4d35e',
+      S: '#7fbf9b',
+      T: '#b794f6',
+      Z: '#f28bb6',
     })
 
     function emptyRow() {
@@ -89,52 +89,14 @@ window.__ModuleLoader__.load({
       return bag
     }
 
-    function pathRoundRect(context, x, y, width, height, radius) {
-      const r = Math.min(radius, width / 2, height / 2)
-      context.beginPath()
-      if (typeof context.roundRect === 'function') {
-        context.roundRect(x, y, width, height, r)
-        return
-      }
-      context.moveTo(x + r, y)
-      context.arcTo(x + width, y, x + width, y + height, r)
-      context.arcTo(x + width, y + height, x, y + height, r)
-      context.arcTo(x, y + height, x, y, r)
-      context.arcTo(x, y, x + width, y, r)
-      context.closePath()
-    }
+    function drawBlock(context, x, y, size, color) {
+      const gap = Math.max(1, Math.round(size * 0.08))
+      const left = Math.round(x + gap / 2)
+      const top = Math.round(y + gap / 2)
+      const side = Math.max(1, Math.round(size - gap))
 
-    function drawBlock(context, x, y, size, color, ghost) {
-      const inset = Math.max(1, size * 0.055)
-      const left = x + inset
-      const top = y + inset
-      const side = size - inset * 2
-      const radius = Math.max(1.5, size * 0.13)
-
-      if (ghost) {
-        context.save()
-        context.globalAlpha = 0.38
-        context.strokeStyle = color
-        context.lineWidth = Math.max(1, size * 0.055)
-        pathRoundRect(context, left, top, side, side, radius)
-        context.stroke()
-        context.restore()
-        return
-      }
-
-      pathRoundRect(context, left, top, side, side, radius)
       context.fillStyle = color
-      context.fill()
-
-      // A restrained two-tone bevel keeps the canvas readable at small sizes.
-      context.save()
-      pathRoundRect(context, left, top, side, side, radius)
-      context.clip()
-      context.fillStyle = 'rgba(255, 255, 255, .26)'
-      context.fillRect(left, top, side, Math.max(1, side * 0.12))
-      context.fillStyle = 'rgba(0, 0, 0, .18)'
-      context.fillRect(left, top + side * 0.78, side, side * 0.22)
-      context.restore()
+      context.fillRect(left, top, side, side)
     }
 
     function createGame(canvas, hooks = {}) {
@@ -285,21 +247,18 @@ window.__ModuleLoader__.load({
         const originX = (rect.width - boardWidth) / 2
         const originY = (rect.height - boardHeight) / 2
 
-        context.fillStyle = '#070a10'
-        context.fillRect(originX, originY, boardWidth, boardHeight)
-
         context.save()
-        context.strokeStyle = 'rgba(255, 255, 255, .045)'
+        context.strokeStyle = 'rgba(148, 163, 184, .28)'
         context.lineWidth = 1
         for (let col = 0; col <= COLS; col += 1) {
-          const x = originX + col * cell + 0.5
+          const x = Math.round(originX + col * cell) + 0.5
           context.beginPath()
           context.moveTo(x, originY)
           context.lineTo(x, originY + boardHeight)
           context.stroke()
         }
         for (let row = 0; row <= ROWS; row += 1) {
-          const y = originY + row * cell + 0.5
+          const y = Math.round(originY + row * cell) + 0.5
           context.beginPath()
           context.moveTo(originX, y)
           context.lineTo(originX + boardWidth, y)
@@ -307,33 +266,11 @@ window.__ModuleLoader__.load({
         }
         context.restore()
 
-        if (current && !over) {
-          let ghostY = current.y
-          while (!collides(board, current.matrix, current.x, ghostY + 1)) ghostY += 1
-          if (ghostY > current.y) {
-            for (let row = 0; row < current.matrix.length; row += 1) {
-              for (let col = 0; col < current.matrix.length; col += 1) {
-                if (!current.matrix[row][col]) continue
-                const y = ghostY + row
-                if (y < 0) continue
-                drawBlock(
-                  context,
-                  originX + (current.x + col) * cell,
-                  originY + y * cell,
-                  cell,
-                  current.color,
-                  true,
-                )
-              }
-            }
-          }
-        }
-
         for (let row = 0; row < ROWS; row += 1) {
           for (let col = 0; col < COLS; col += 1) {
             const color = board[row][col]
             if (!color) continue
-            drawBlock(context, originX + col * cell, originY + row * cell, cell, color, false)
+            drawBlock(context, originX + col * cell, originY + row * cell, cell, color)
           }
         }
 
@@ -349,7 +286,6 @@ window.__ModuleLoader__.load({
                 originY + y * cell,
                 cell,
                 current.color,
-                false,
               )
             }
           }
@@ -461,366 +397,129 @@ window.__ModuleLoader__.load({
 
       .dsh-tetris-root {
         position: fixed;
-        right: max(20px, env(safe-area-inset-right));
-        bottom: max(20px, env(safe-area-inset-bottom));
+        right: max(16px, env(safe-area-inset-right));
+        bottom: max(16px, env(safe-area-inset-bottom));
         z-index: 30;
         pointer-events: auto;
-        color-scheme: dark;
         font-family: inherit;
+        color: inherit;
       }
 
       .dsh-tetris-launch {
         appearance: none;
         -webkit-appearance: none;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        height: 48px;
-        padding: 0 15px 0 11px;
-        border: 1px solid rgba(255, 255, 255, .16);
-        border-radius: 14px;
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, 0) 46%),
-          #141824;
-        color: #f5f7ff;
-        box-shadow:
-          0 16px 40px rgba(0, 0, 0, .34),
-          0 1px 0 rgba(255, 255, 255, .13) inset;
-        font: inherit;
-        cursor: pointer;
-        user-select: none;
-        transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
-      }
-      .dsh-tetris-launch:hover {
-        transform: translateY(-2px);
-        border-color: rgba(121, 219, 255, .52);
-        box-shadow:
-          0 20px 48px rgba(0, 0, 0, .42),
-          0 0 0 1px rgba(72, 215, 255, .08) inset,
-          0 1px 0 rgba(255, 255, 255, .15) inset;
-      }
-      .dsh-tetris-launch:active { transform: translateY(0) scale(.985); }
-      .dsh-tetris-launch:focus-visible {
-        outline: 2px solid #71e2ff;
-        outline-offset: 3px;
-      }
-
-      .dsh-tetris-mark {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        grid-template-rows: repeat(2, 1fr);
-        gap: 2px;
-        width: 26px;
-        height: 26px;
-        padding: 2px;
-        flex: none;
-        border-radius: 7px;
-        background: rgba(255, 255, 255, .055);
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, .06) inset;
+        place-items: center;
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        opacity: .78;
+        cursor: pointer;
+        transition: opacity .12s ease;
       }
-      .dsh-tetris-mark i {
+      .dsh-tetris-launch::before {
+        content: "";
         display: block;
-        border-radius: 2px;
-        box-shadow: 0 1px 0 rgba(255, 255, 255, .26) inset;
+        width: 16px;
+        height: 16px;
+        border-radius: 0;
+        background: #b794f6;
       }
-      .dsh-tetris-mark i:nth-child(1) { grid-area: 1 / 2; background: #48d7ff; }
-      .dsh-tetris-mark i:nth-child(2) { grid-area: 2 / 1; background: #ffd166; }
-      .dsh-tetris-mark i:nth-child(3) { grid-area: 2 / 2; background: #b98cff; }
-      .dsh-tetris-mark i:nth-child(4) { grid-area: 2 / 3; background: #ff7b9c; }
-
-      .dsh-tetris-label {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 3px;
-        line-height: 1;
-        white-space: nowrap;
-      }
-      .dsh-tetris-label strong {
-        font-size: 13px;
-        font-weight: 650;
-        letter-spacing: .015em;
-      }
-      .dsh-tetris-label small {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 8px;
-        line-height: 1;
-        letter-spacing: .18em;
-        color: #8d96ad;
+      .dsh-tetris-launch:hover { opacity: 1; }
+      .dsh-tetris-launch:focus-visible {
+        outline: 1px solid #b794f6;
+        outline-offset: 3px;
       }
 
       .dsh-tetris-panel {
-        position: relative;
         display: flex;
         flex-direction: column;
-        width: min(332px, calc(100vw - 24px));
-        max-height: calc(100dvh - 40px);
-        overflow: hidden;
-        border: 1px solid rgba(255, 255, 255, .13);
-        border-radius: 20px;
-        background:
-          radial-gradient(90% 70% at 100% 0%, rgba(100, 83, 255, .17), transparent 54%),
-          radial-gradient(70% 54% at 0% 100%, rgba(44, 186, 255, .08), transparent 62%),
-          #0c0f16;
-        box-shadow:
-          0 34px 90px rgba(0, 0, 0, .54),
-          0 0 0 1px rgba(0, 0, 0, .25),
-          0 1px 0 rgba(255, 255, 255, .06) inset;
-        animation: dsh-tetris-pop .2s cubic-bezier(.2, .85, .3, 1.08);
-        outline: none;
-      }
-      .dsh-tetris-panel::before {
-        content: "";
-        position: absolute;
-        z-index: 2;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 2px;
-        background: linear-gradient(90deg, #48d7ff, #8f7bff 34%, #ffd166 68%, #ff7b9c);
-        opacity: .92;
-        pointer-events: none;
-      }
-      .dsh-tetris-panel:focus-visible {
-        outline: 2px solid rgba(113, 226, 255, .65);
-        outline-offset: 3px;
-      }
-
-      .dsh-tetris-header {
-        display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-        padding: 16px 13px 10px;
-      }
-      .dsh-tetris-brand {
-        display: flex;
-        align-items: center;
-        gap: 9px;
-        min-width: 0;
-      }
-      .dsh-tetris-brand .dsh-tetris-mark {
-        width: 22px;
-        height: 22px;
-        border-radius: 6px;
-      }
-      .dsh-tetris-brand .dsh-tetris-title {
-        display: flex;
-        flex-direction: column;
-        gap: 3px;
-        min-width: 0;
-        line-height: 1;
-      }
-      .dsh-tetris-title strong {
-        color: #f5f7ff;
-        font-size: 13px;
-        font-weight: 650;
-        letter-spacing: .03em;
-      }
-      .dsh-tetris-title span {
-        color: #7d8599;
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 8px;
-        letter-spacing: .16em;
-      }
-
-      .dsh-tetris-actions { display: flex; align-items: center; gap: 3px; }
-      .dsh-tetris-icon-button {
-        appearance: none;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 28px;
-        height: 28px;
+        width: min(300px, calc(100vw - 24px));
+        max-height: calc(100dvh - 32px);
         padding: 0;
-        border: 1px solid transparent;
-        border-radius: 8px;
+        border: 0;
+        border-radius: 0;
         background: transparent;
-        color: #9aa4b9;
-        cursor: pointer;
-        transition: background .14s ease, color .14s ease;
+        box-shadow: none;
+        outline: none;
+        color: inherit;
       }
-      .dsh-tetris-icon-button:hover:not(:disabled) {
-        background: rgba(255, 255, 255, .075);
-        color: #f5f7ff;
-      }
-      .dsh-tetris-icon-button:focus-visible {
-        outline: 2px solid #71e2ff;
-        outline-offset: 1px;
-      }
-      .dsh-tetris-icon-button:disabled { opacity: .35; cursor: default; }
 
-      .dsh-tetris-board-wrap {
+      .dsh-tetris-stage {
         display: flex;
         justify-content: center;
-        padding: 3px 14px 8px;
-        background: radial-gradient(70% 64% at 50% 45%, rgba(80, 107, 255, .1), transparent 72%);
-      }
-      .dsh-tetris-stage {
-        position: relative;
-        display: flex;
-        max-width: 100%;
-        overflow: hidden;
-        border-radius: 9px;
-        background: #070a10;
-        box-shadow:
-          0 0 0 1px rgba(255, 255, 255, .085),
-          0 18px 42px rgba(0, 0, 0, .38);
+        width: 100%;
+        overflow: visible;
+        background: transparent;
+        border-radius: 0;
+        box-shadow: none;
       }
       .dsh-tetris-canvas {
         display: block;
         width: auto;
-        height: min(52dvh, 480px);
+        height: min(56dvh, 560px);
         aspect-ratio: 1 / 2;
         max-width: 100%;
+        background: transparent;
         touch-action: none;
-      }
-
-      .dsh-tetris-state {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 16px;
-        text-align: center;
-        background: rgba(5, 7, 11, .76);
-        -webkit-backdrop-filter: blur(3px);
-        backdrop-filter: blur(3px);
-      }
-      .dsh-tetris-state .dsh-tetris-eyebrow {
-        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        font-size: 9px;
-        font-weight: 600;
-        letter-spacing: .2em;
-        color: #71e2ff;
-      }
-      .dsh-tetris-state[data-over="true"] .dsh-tetris-eyebrow { color: #ff91a7; }
-      .dsh-tetris-state strong {
-        color: #f6f8ff;
-        font-size: 18px;
-        font-weight: 650;
-        letter-spacing: .02em;
-      }
-      .dsh-tetris-state p {
-        margin: 0;
-        color: #929bb0;
-        font-size: 10.5px;
-        line-height: 1.55;
-      }
-      .dsh-tetris-state button {
-        appearance: none;
-        height: 30px;
-        margin-top: 3px;
-        padding: 0 13px;
-        border: none;
-        border-radius: 8px;
-        background: #eef3ff;
-        color: #111522;
-        font: inherit;
-        font-size: 11px;
-        font-weight: 650;
-        cursor: pointer;
-        transition: transform .14s ease, background .14s ease;
-      }
-      .dsh-tetris-state button:hover { background: #fff; transform: translateY(-1px); }
-      .dsh-tetris-state button:active { transform: translateY(0) scale(.98); }
-      .dsh-tetris-state button:focus-visible {
-        outline: 2px solid #71e2ff;
-        outline-offset: 2px;
       }
 
       .dsh-tetris-footer {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        padding: 0 14px 12px;
+        align-items: center;
+        gap: 4px;
+        width: 100%;
+        padding: 5px 2px 0;
+        background: transparent;
       }
-      .dsh-tetris-hint {
-        overflow: hidden;
-        color: #778095;
+      .dsh-tetris-status {
+        min-height: 13px;
+        margin: 0;
+        color: #8b5cf6;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-size: 9.5px;
-        line-height: 1.4;
-        letter-spacing: .035em;
+        font-weight: 600;
+        line-height: 13px;
+        letter-spacing: .12em;
         text-align: center;
-        text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .dsh-tetris-controls {
-        display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 6px;
+      .dsh-tetris-status[data-over="true"] { color: #e0447f; }
+      .dsh-tetris-hint {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 2px 9px;
+        margin: 0;
+        color: inherit;
+        opacity: .68;
+        font-size: 10px;
+        line-height: 1.55;
+        letter-spacing: .02em;
+        text-align: center;
       }
-      .dsh-tetris-control {
-        appearance: none;
-        height: 34px;
-        padding: 0;
-        border: 1px solid rgba(255, 255, 255, .085);
-        border-radius: 9px;
-        background: rgba(255, 255, 255, .045);
-        color: #c9d2e6;
-        font: inherit;
-        font-size: 15px;
-        line-height: 1;
-        cursor: pointer;
-        user-select: none;
-        transition: background .12s ease, color .12s ease, transform .12s ease;
-      }
-      .dsh-tetris-control[data-action="drop"] { color: #71e2ff; }
-      .dsh-tetris-control:hover:not(:disabled) {
-        background: rgba(255, 255, 255, .09);
-        color: #fff;
-      }
-      .dsh-tetris-control:active:not(:disabled) { transform: scale(.95); }
-      .dsh-tetris-control:focus-visible {
-        outline: 2px solid #71e2ff;
-        outline-offset: 1px;
-      }
-      .dsh-tetris-control:disabled { opacity: .35; cursor: default; }
+      .dsh-tetris-hint span { white-space: nowrap; }
 
-      .dsh-tetris-sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0 0 0 0);
-        white-space: nowrap;
-        border: 0;
-      }
-
-      @keyframes dsh-tetris-pop {
-        from { opacity: 0; transform: translateY(9px) scale(.98); }
-        to { opacity: 1; transform: translateY(0) scale(1); }
-      }
-
-      @media (max-height: 700px) {
-        .dsh-tetris-canvas { height: min(46dvh, 420px); }
-        .dsh-tetris-hint { display: none; }
-        .dsh-tetris-header { padding-top: 13px; padding-bottom: 8px; }
-      }
-      @media (max-height: 560px) {
-        .dsh-tetris-canvas { height: min(44dvh, 330px); }
-        .dsh-tetris-footer { gap: 6px; padding-bottom: 8px; }
-        .dsh-tetris-control { height: 30px; }
-      }
       @media (max-width: 560px) {
         .dsh-tetris-root {
           right: max(12px, env(safe-area-inset-right));
           bottom: max(12px, env(safe-area-inset-bottom));
         }
-        .dsh-tetris-panel { max-height: calc(100dvh - 24px); }
-        .dsh-tetris-launch { height: 44px; padding-right: 12px; }
+        .dsh-tetris-panel { width: min(300px, calc(100vw - 20px)); }
+        .dsh-tetris-canvas { height: min(52dvh, 540px); }
+        .dsh-tetris-hint { gap: 2px 7px; font-size: 9.5px; }
+      }
+      @media (max-height: 560px) {
+        .dsh-tetris-canvas { height: min(50dvh, 340px); }
+        .dsh-tetris-hint { font-size: 8.5px; }
       }
       @media (prefers-reduced-motion: reduce) {
-        .dsh-tetris-panel { animation: none; }
-        .dsh-tetris-launch,
-        .dsh-tetris-state button,
-        .dsh-tetris-control,
-        .dsh-tetris-icon-button { transition: none; }
+        .dsh-tetris-launch { transition: none; }
       }
     `
 
@@ -832,40 +531,6 @@ window.__ModuleLoader__.load({
         document.head.appendChild(style)
         return () => style.remove()
       }, [])
-    }
-
-    function TetrisMark() {
-      return h(
-        'span',
-        { className: 'dsh-tetris-mark', 'aria-hidden': 'true' },
-        h('i'), h('i'), h('i'), h('i'),
-      )
-    }
-
-    function PauseIcon({ paused }) {
-      return h(
-        'svg',
-        { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': 'true' },
-        paused
-          ? h('path', { d: 'M8 5.5v13l10-6.5-10-6.5Z', fill: 'currentColor' })
-          : h('g', { fill: 'currentColor' },
-              h('rect', { x: 7, y: 5, width: 3.5, height: 14, rx: 1 }),
-              h('rect', { x: 13.5, y: 5, width: 3.5, height: 14, rx: 1 }),
-            ),
-      )
-    }
-
-    function CloseIcon() {
-      return h(
-        'svg',
-        { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': 'true' },
-        h('path', {
-          d: 'M6 6l12 12M18 6 6 18',
-          stroke: 'currentColor',
-          strokeWidth: '1.8',
-          strokeLinecap: 'round',
-        }),
-      )
     }
 
     function TetrisDock() {
@@ -902,17 +567,42 @@ window.__ModuleLoader__.load({
         }
       }, [open])
 
+      useEffect(() => {
+        if (!open) return undefined
+        function collapse() {
+          setOpen(false)
+          setPaused(false)
+          setOver(false)
+          requestAnimationFrame(() => {
+            launchRef.current?.focus({ preventScroll: true })
+          })
+        }
+        function onVisibilityChange() {
+          if (document.hidden) collapse()
+        }
+        window.addEventListener('blur', collapse)
+        document.addEventListener('visibilitychange', onVisibilityChange)
+        return () => {
+          window.removeEventListener('blur', collapse)
+          document.removeEventListener('visibilitychange', onVisibilityChange)
+        }
+      }, [open])
+
       function openGame() {
         setPaused(false)
         setOver(false)
         setOpen(true)
       }
 
-      function closeGame() {
+      function collapseGame(restoreFocus = false) {
         setOpen(false)
         setPaused(false)
         setOver(false)
-        requestAnimationFrame(() => launchRef.current?.focus({ preventScroll: true }))
+        if (restoreFocus) {
+          requestAnimationFrame(() => {
+            launchRef.current?.focus({ preventScroll: true })
+          })
+        }
       }
 
       function restartGame() {
@@ -922,37 +612,26 @@ window.__ModuleLoader__.load({
         rootRef.current?.focus({ preventScroll: true })
       }
 
-      function resumeGame() {
-        gameRef.current?.resume()
-        rootRef.current?.focus({ preventScroll: true })
-      }
-
       function togglePause() {
         if (over) return
         gameRef.current?.togglePause()
       }
 
       function handleBlur(event) {
-        if (!open || over) return
         if (event.currentTarget.contains(event.relatedTarget)) return
-        gameRef.current?.pause()
+        collapseGame(!event.relatedTarget)
       }
 
       function handleKeyDown(event) {
         if (event.altKey || event.ctrlKey || event.metaKey) return
-        const target = event.target
-        const onButton = target instanceof HTMLElement && target.closest('button') !== null
         const key = event.key
 
         if (key === 'Escape') {
           event.preventDefault()
           event.stopPropagation()
-          closeGame()
+          collapseGame(true)
           return
         }
-
-        // Let Space/Enter activate a focused control instead of dropping a piece.
-        if (onButton && (key === ' ' || key === 'Enter')) return
 
         if (key === 'p' || key === 'P') {
           event.preventDefault()
@@ -970,7 +649,18 @@ window.__ModuleLoader__.load({
           return
         }
 
-        if (paused) return
+        if (paused) {
+          if (
+            key.startsWith('Arrow') ||
+            key === ' ' ||
+            key === 'x' || key === 'X' ||
+            key === 'z' || key === 'Z'
+          ) {
+            event.preventDefault()
+            event.stopPropagation()
+          }
+          return
+        }
 
         switch (key) {
           case 'ArrowLeft':
@@ -1015,25 +705,15 @@ window.__ModuleLoader__.load({
         return h(
           'div',
           { className: 'dsh-tetris-root' },
-          h(
-            'button',
-            {
-              ref: launchRef,
-              type: 'button',
-              className: 'dsh-tetris-launch',
-              onClick: openGame,
-              'aria-haspopup': 'dialog',
-              'aria-expanded': false,
-              title: '打开俄罗斯方块',
-            },
-            h(TetrisMark),
-            h(
-              'span',
-              { className: 'dsh-tetris-label' },
-              h('strong', null, '俄罗斯方块'),
-              h('small', null, 'START GAME'),
-            ),
-          ),
+          h('button', {
+            ref: launchRef,
+            type: 'button',
+            className: 'dsh-tetris-launch',
+            onClick: openGame,
+            'aria-label': '打开俄罗斯方块',
+            'aria-haspopup': 'dialog',
+            'aria-expanded': false,
+          }),
         )
       }
 
@@ -1047,146 +727,52 @@ window.__ModuleLoader__.load({
             className: 'dsh-tetris-panel',
             role: 'dialog',
             'aria-modal': 'false',
-            'aria-labelledby': 'dsh-tetris-title',
+            'aria-label': '俄罗斯方块',
             'aria-describedby': 'dsh-tetris-hint',
             tabIndex: 0,
             onKeyDown: handleKeyDown,
             onBlur: handleBlur,
+            onMouseDown: (event) => event.preventDefault(),
           },
           h(
-            'header',
-            { className: 'dsh-tetris-header' },
-            h(
-              'div',
-              { className: 'dsh-tetris-brand' },
-              h(TetrisMark),
-              h(
-                'div',
-                { className: 'dsh-tetris-title' },
-                h('strong', { id: 'dsh-tetris-title' }, '俄罗斯方块'),
-                h('span', null, 'TETRIS · NO SCORE'),
-              ),
-            ),
-            h(
-              'div',
-              { className: 'dsh-tetris-actions' },
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'dsh-tetris-icon-button',
-                  onClick: togglePause,
-                  disabled: over,
-                  'aria-label': paused ? '继续游戏' : '暂停游戏',
-                  'aria-pressed': paused,
-                  title: paused ? '继续 (P)' : '暂停 (P)',
-                },
-                h(PauseIcon, { paused }),
-              ),
-              h(
-                'button',
-                {
-                  type: 'button',
-                  className: 'dsh-tetris-icon-button',
-                  onClick: closeGame,
-                  'aria-label': '关闭俄罗斯方块',
-                  title: '关闭 (Esc)',
-                },
-                h(CloseIcon),
-              ),
-            ),
-          ),
-          h(
             'div',
-            { className: 'dsh-tetris-board-wrap' },
-            h(
-              'div',
-              { className: 'dsh-tetris-stage' },
-              h('canvas', {
-                ref: canvasRef,
-                className: 'dsh-tetris-canvas',
-                width: 300,
-                height: 600,
-                'aria-hidden': 'true',
-              }),
-              over
-                ? h(
-                    'div',
-                    { className: 'dsh-tetris-state', 'data-over': 'true', role: 'status' },
-                    h('span', { className: 'dsh-tetris-eyebrow' }, 'GAME OVER'),
-                    h('strong', null, '方块堆满了'),
-                    h('p', null, '再来一局，继续消磨等待的时间。'),
-                    h('button', { type: 'button', onClick: restartGame }, '再来一局'),
-                  )
-                : paused
-                  ? h(
-                      'div',
-                      { className: 'dsh-tetris-state', 'data-over': 'false', role: 'status' },
-                      h('span', { className: 'dsh-tetris-eyebrow' }, 'PAUSED'),
-                      h('strong', null, '游戏已暂停'),
-                      h('p', null, '点击继续，或按 P 恢复。'),
-                      h('button', { type: 'button', onClick: resumeGame }, '继续游戏'),
-                    )
-                  : null,
-            ),
+            { className: 'dsh-tetris-stage' },
+            h('canvas', {
+              ref: canvasRef,
+              className: 'dsh-tetris-canvas',
+              width: 300,
+              height: 600,
+              'aria-hidden': 'true',
+            }),
           ),
           h(
             'footer',
             { className: 'dsh-tetris-footer' },
             h(
-              'div',
-              { className: 'dsh-tetris-hint', id: 'dsh-tetris-hint' },
-              '← → 移动 · ↑ / X 旋转 · ↓ 软降 · 空格 落下',
+              'p',
+              {
+                className: 'dsh-tetris-status',
+                'data-over': over ? 'true' : 'false',
+                role: 'status',
+                'aria-live': 'polite',
+                'aria-atomic': 'true',
+              },
+              over ? 'GAME OVER · R 重开' : paused ? 'PAUSED · P 继续' : '',
             ),
             h(
-              'div',
-              { className: 'dsh-tetris-controls', 'aria-label': '游戏控制' },
-              h('button', {
-                type: 'button',
-                className: 'dsh-tetris-control',
-                onClick: () => gameRef.current?.moveLeft(),
-                disabled: paused || over,
-                'aria-label': '向左移动',
-                title: '向左移动 (←)',
-              }, '←'),
-              h('button', {
-                type: 'button',
-                className: 'dsh-tetris-control',
-                onClick: () => gameRef.current?.rotateCW(),
-                disabled: paused || over,
-                'aria-label': '顺时针旋转',
-                title: '顺时针旋转 (↑ / X)',
-              }, '↻'),
-              h('button', {
-                type: 'button',
-                className: 'dsh-tetris-control',
-                onClick: () => gameRef.current?.moveRight(),
-                disabled: paused || over,
-                'aria-label': '向右移动',
-                title: '向右移动 (→)',
-              }, '→'),
-              h('button', {
-                type: 'button',
-                className: 'dsh-tetris-control',
-                onClick: () => gameRef.current?.softDrop(),
-                disabled: paused || over,
-                'aria-label': '向下软降',
-                title: '向下软降 (↓)',
-              }, '↓'),
-              h('button', {
-                type: 'button',
-                className: 'dsh-tetris-control',
-                'data-action': 'drop',
-                onClick: () => gameRef.current?.hardDrop(),
-                disabled: paused || over,
-                'aria-label': '直接落下',
-                title: '直接落下 (空格)',
-              }, '⇣'),
-            ),
-            h(
-              'div',
-              { className: 'dsh-tetris-sr-only', 'aria-live': 'polite' },
-              over ? '游戏结束，方块堆满了' : paused ? '游戏已暂停' : '',
+              'p',
+              {
+                className: 'dsh-tetris-hint',
+                id: 'dsh-tetris-hint',
+                'aria-label': '左、右移动，上或 X 旋转，Z 逆转，下软降，空格硬降，P 暂停，Esc 收起',
+              },
+              h('span', null, '← → 移动'),
+              h('span', null, '↑ / X 旋转'),
+              h('span', null, 'Z 逆转'),
+              h('span', null, '↓ 软降'),
+              h('span', null, '空格 硬降'),
+              h('span', null, 'P 暂停'),
+              h('span', null, 'Esc 收起'),
             ),
           ),
         ),
